@@ -87,11 +87,6 @@ class SequenceBuilder:
         self.loop = loop
         self.prefix = prefix
         self.parallel = parallel
-        if parallel:
-            self.tasks = set()
-            self.futures = dict()  # task -> future
-            # self.executor = concurrent.futures.ProcessPoolExecutor()
-            # num_processes = executor._max_workers
 
     def _generate_options_iterable(self, seq: tuple[Op, ...]) -> Iterable[Op]:
         if self.options is not None:
@@ -133,26 +128,62 @@ class SequenceBuilder:
         return self._iter(self.prefix)
 
     def _iter(self, prefix: tuple[Op, ...] = ()) -> Iterable[tuple[Op, ...]]:
-        seqs = [prefix]
         # breakpoint()
 
         if self.parallel:
-            executor = concurrent.futures.ProcessPoolExecutor()
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                # seqs = {prefix}
+                # concurrent.futures.Future()
+                # seqs_done = set()
+                # seqs_started = set()
+                # future_to_seq = dict()
+                future_to_seq = {executor.submit(self._generate_candidates, prefix): prefix}
 
-        while seqs:
-            # print(seqs)
-            seqs_new = []
-            for seq in seqs:
-                if len(seq) == self.n:
-                    yield seq
-                else:
-                    # print('seqs_new1:', seqs_new)
-                    seqs_new += self._generate_candidates(seq)
-                    # print('seqs_new2:', seqs_new)
-            seqs = seqs_new
+                while True:
 
-        if self.parallel:
-            executor.shutdown()
+                    # done, not_done = concurrent.futures.wait(future_to_seq, return_when=concurrent.futures.FIRST_COMPLETED)
+                    done, not_done = concurrent.futures.wait(future_to_seq, return_when=concurrent.futures.FIRST_EXCEPTION)
+                    # breakpoint()
+                    # print(next(iter(done)).exception())
+                    # print(done)
+                    all_completed = True
+                    for future in done:
+                        for seq in future.result():
+                            if len(seq) == self.n:
+                                yield seq
+                            else:
+                                future_to_seq[executor.submit(self._generate_candidates, seq)] = seq
+                                all_completed = False
+                    if all_completed:
+                        break
+                    # yield from {future_to_seq[future] for future in done}
+                    # if
+                    # seqs_new = set()
+                    # for seq in seqs:
+
+
+                            # seqs_started.add()
+                            # seqs_new += self._generate_candidates(seq)
+
+                # seqs = seqs_new
+            # futures = dict()  # task -> future
+            # self.executor = concurrent.futures.ProcessPoolExecutor()
+            # num_processes = executor._max_workers
+        else:
+            seqs = [prefix]
+            while seqs:
+                # print(seqs)
+                seqs_new = []
+                for seq in seqs:
+                    if len(seq) == self.n:
+                        yield seq
+                    else:
+                        # print('seqs_new1:', seqs_new)
+                        seqs_new += self._generate_candidates(seq)
+                        # print('seqs_new2:', seqs_new)
+                seqs = seqs_new
+
+
 
         # map_func = partial(self._generate_candidates, seq=seq)
         # if len(prefix) == len(self.prefix):
@@ -167,30 +198,28 @@ class SequenceBuilder:
         #     it = map(map_func, ops)
         # it = itertools.chain.from_iterable(it)
         # yield from it
-
+    def inner(self, op, seq):
+        candidate = seq + (op,)
+        if self.candidate_constraint is not None and not self.candidate_constraint(candidate):
+            return
+        # if len(candidate) < self.n:
+            # yield from self._iter(prefix=candidate)
+            # return
+        if len(candidate) == self.n and self.curr_prev_constraint and self.loop and not all(
+            f(candidate[(i + k) % self.n], candidate[i])
+            for k, f in self.curr_prev_constraint.items()
+                for i in range(abs(k))
+        ):
+            return
+        yield candidate
     # def _generate_candidates(self, op: Op, seq: tuple[Op, ...]) -> Iterable[tuple[Op, ...]]:
+
     def _generate_candidates(self, seq: tuple[Op, ...]) -> Iterable[tuple[Op, ...]]:
         # print('seq:', seq)
-
-        def inner(op):
-            candidate = seq + (op,)
-            if self.candidate_constraint is not None and not self.candidate_constraint(candidate):
-                return
-            # if len(candidate) < self.n:
-                # yield from self._iter(prefix=candidate)
-                # return
-            if len(candidate) == self.n and self.curr_prev_constraint and self.loop and not all(
-                f(candidate[(i + k) % self.n], candidate[i])
-                for k, f in self.curr_prev_constraint.items()
-                    for i in range(abs(k))
-            ):
-                return
-            yield candidate
-
         ops = self.generate_options(seq)
         # print('ops:', ops)
         # flat_map
-        seqs = map(inner, ops)
+        seqs = map(partial(self.inner, seq=seq), ops)
         seqs = itertools.chain.from_iterable(seqs)
         # seqs = list(seqs)
         # print('*', seqs)
