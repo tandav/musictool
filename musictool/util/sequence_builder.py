@@ -113,7 +113,6 @@ class SequenceBuilder:
         if self.i_constraints is not None and (i_constraint := self.i_constraints.get(len(seq))):
             ops = filter(i_constraint, ops)
 
-
         if self.unique_key:
             prefix_keys = frozenset(self.unique_key(op) for op in seq)
             ops = [op for op in ops if self.unique_key(op) not in prefix_keys]
@@ -134,38 +133,59 @@ class SequenceBuilder:
         return self._iter(self.prefix)
 
     def _iter(self, prefix: tuple[Op, ...] = ()) -> Iterable[tuple[Op, ...]]:
-        seq = prefix
-        ops = self.generate_options(seq)
+        seqs = [prefix]
+        # breakpoint()
+        while seqs:
+            # print(seqs)
+            seqs_new = []
+            for seq in seqs:
+                if len(seq) == self.n:
+                    yield seq
+                else:
+                    # print('seqs_new1:', seqs_new)
+                    seqs_new += self._generate_candidates(seq)
+                    # print('seqs_new2:', seqs_new)
+            seqs = seqs_new
 
-        map_func = partial(self._generate_candidates, seq=seq)
+        # map_func = partial(self._generate_candidates, seq=seq)
+        # if len(prefix) == len(self.prefix):
+        #     if self.parallel:
+        #         with concurrent.futures.ProcessPoolExecutor() as executor:
+        #             for it in tqdm.tqdm(executor.map(map_func, ops), total=len(ops)):
+        #                 yield from it
+        #         return
+        #     else:
+        #         it = tqdm.tqdm(map(map_func, ops), total=len(ops))
+        # else:
+        #     it = map(map_func, ops)
+        # it = itertools.chain.from_iterable(it)
+        # yield from it
 
-        if len(prefix) == len(self.prefix):
-            if self.parallel:
-                with concurrent.futures.ProcessPoolExecutor() as executor:
-                    for it in tqdm.tqdm(executor.map(map_func, ops), total=len(ops)):
-                        yield from it
-                return
-            else:
-                it = tqdm.tqdm(map(map_func, ops), total=len(ops))
-        else:
-            it = map(map_func, ops)
-        it = itertools.chain.from_iterable(it)
-        yield from it
+    # def _generate_candidates(self, op: Op, seq: tuple[Op, ...]) -> Iterable[tuple[Op, ...]]:
+    def _generate_candidates(self, seq: tuple[Op, ...]) -> Iterable[tuple[Op, ...]]:
+        # print('seq:', seq)
 
-    def _generate_candidates(self, op: Op, seq: tuple[Op, ...]) -> Iterable[tuple[Op, ...]]:
-        def inner():
+        def inner(op):
             candidate = seq + (op,)
             if self.candidate_constraint is not None and not self.candidate_constraint(candidate):
                 return
-            if len(candidate) < self.n:
-                yield from self._iter(prefix=candidate)
-                return
-            if self.curr_prev_constraint and self.loop and not all(
+            # if len(candidate) < self.n:
+                # yield from self._iter(prefix=candidate)
+                # return
+            if len(candidate) == self.n and self.curr_prev_constraint and self.loop and not all(
                 f(candidate[(i + k) % self.n], candidate[i])
                 for k, f in self.curr_prev_constraint.items()
                     for i in range(abs(k))
             ):
                 return
             yield candidate
-        out = tuple(inner())
-        return out
+
+        ops = self.generate_options(seq)
+        # print('ops:', ops)
+        seqs = map(inner, ops)
+        seqs = itertools.chain.from_iterable(seqs)
+        seqs = list(seqs)
+        # print('*', seqs)
+        # breakpoint()
+        # out = tuple(inner())
+        return seqs
