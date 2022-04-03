@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches:
-      - master
+      - '*'
     tags:
       - 'v*'
 
@@ -19,14 +19,15 @@ jobs:
       - name: install python dependencies
         run: python3 -m pip install -r requirements-dev.txt
 
-      - name: lint
-        run: make check-lint
+      - name: test
+        run: make test
 
       - name: mypy
         run: make mypy
 
-      - name: test
-        run: make test
+      - name: lint
+        run: make check-lint
+
 
   build-and-publish-to-pypi:
     runs-on: ubuntu-latest

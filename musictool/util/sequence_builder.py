@@ -137,12 +137,13 @@ class SequenceBuilder:
                 # seqs_done = set()
                 # seqs_started = set()
                 # future_to_seq = dict()
-                future_to_seq = {executor.submit(self._generate_candidates, prefix): prefix}
+                futures = {executor.submit(self._generate_candidates, prefix)}
 
                 while True:
 
-                    # done, not_done = concurrent.futures.wait(future_to_seq, return_when=concurrent.futures.FIRST_COMPLETED)
-                    done, not_done = concurrent.futures.wait(future_to_seq, return_when=concurrent.futures.FIRST_EXCEPTION)
+                    done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+                    # done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                    # done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
                     # breakpoint()
                     # print(next(iter(done)).exception())
                     # print(done)
@@ -152,7 +153,7 @@ class SequenceBuilder:
                             if len(seq) == self.n:
                                 yield seq
                             else:
-                                future_to_seq[executor.submit(self._generate_candidates, seq)] = seq
+                                futures.add(executor.submit(self._generate_candidates, seq))
                                 all_completed = False
                     if all_completed:
                         break
@@ -198,6 +199,7 @@ class SequenceBuilder:
         #     it = map(map_func, ops)
         # it = itertools.chain.from_iterable(it)
         # yield from it
+
     def inner(self, op, seq):
         candidate = seq + (op,)
         if self.candidate_constraint is not None and not self.candidate_constraint(candidate):

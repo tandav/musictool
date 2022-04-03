@@ -101,8 +101,8 @@ def test_candidate_constraint(parallel):
 
 @pytest.mark.parametrize('parallel', (False, True))
 def test_options_kind_callable(parallel):
-    assert list(SequenceBuilder(3, options_callable=options_callable_0, prefix=(0,), parallel=parallel)) == [(0, 1, 2)]
-    assert list(SequenceBuilder(3, options_callable=options_callable_1, prefix=(0,), parallel=parallel)) == [(0, 1, 2), (0, 1, 10), (0, 0, 1), (0, 0, 0)]
+    assert set(SequenceBuilder(3, options_callable=options_callable_0, prefix=(0,), parallel=parallel)) == {(0, 1, 2)}
+    assert set(SequenceBuilder(3, options_callable=options_callable_1, prefix=(0,), parallel=parallel)) == {(0, 1, 2), (0, 1, 10), (0, 0, 1), (0, 0, 0)}
 
 
 @pytest.mark.parametrize('parallel', (False, True))
@@ -120,9 +120,11 @@ def test_parallel():
     options_0 = 0, 1, 2, 3, 4, 5, 6, 7, 8
     a = SequenceBuilder(5, options=options_0, i_constraints={0: is_even})
     b = SequenceBuilder(5, options=options_0, i_constraints={0: is_even}, parallel=True)
-    assert tuple(a) == tuple(b)
+    # assert tuple(a) == tuple(b)
+    assert frozenset(a) == frozenset(b)
 
     options_1 = 'A0', 'A1', 'C0', 'D0', 'D1', 'G0'
     a = SequenceBuilder(5, options=options_1, curr_prev_constraint={-1: different_startswith, -2: equal_endswith})
     b = SequenceBuilder(5, options=options_1, curr_prev_constraint={-1: different_startswith, -2: equal_endswith}, parallel=True)
-    assert tuple(a) == tuple(b)
+    # assert tuple(a) == tuple(b)
+    assert frozenset(a) == frozenset(b)
