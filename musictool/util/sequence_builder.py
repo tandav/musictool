@@ -5,7 +5,7 @@ import pickle
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Sequence
-from concurrent.futures import ProcessPoolExecutor
+import concurrent.futures
 from functools import partial
 from typing import Any
 from typing import TypeVar
@@ -20,6 +20,7 @@ OpsCallableFromCurr = Callable[[Op], Iterable[Op]]
 
 
 OPTIONS_EXCEPTION = TypeError('options, options_i, options_callable are mutually exclusive. Only 1 must be not None')
+executor = concurrent.futures.ProcessPoolExecutor()
 
 
 class SequenceBuilder:
@@ -61,19 +62,19 @@ class SequenceBuilder:
             if len(options_seq) != len(frozenset(options_seq)):
                 raise ValueError('options should be unique')
             self.options = options_seq
-            self.generate_options = self._generate_options_iterable
+            self._generate_options = self._generate_options_iterable
         elif options_i is not None:
             if not (options is None and options_callable is None):
                 raise OPTIONS_EXCEPTION
             if len(options_i) != n:
                 raise ValueError('options_i should have options for each step up to n')
             self.options = options
-            self.generate_options = self._generate_options_fixed_per_step
+            self._generate_options = self._generate_options_fixed_per_step
         elif options_callable is not None:
             if not (options is None and options_i is None):
                 raise OPTIONS_EXCEPTION
             self.options = options
-            self.generate_options = self._generate_options_callable_from_curr
+            self._generate_options = self._generate_options_callable_from_curr
         self.options_i = options_i
         self.options_callable = options_callable
 
@@ -86,6 +87,11 @@ class SequenceBuilder:
         self.loop = loop
         self.prefix = prefix
         self.parallel = parallel
+        if parallel:
+            self.tasks = set()
+            self.futures = dict()  # task -> future
+            # self.executor = concurrent.futures.ProcessPoolExecutor()
+            # num_processes = executor._max_workers
 
     def _generate_options_iterable(self, seq: tuple[Op, ...]) -> Iterable[Op]:
         if self.options is not None:
@@ -102,18 +108,14 @@ class SequenceBuilder:
             return self.options_callable(seq[-1])
         raise TypeError
 
-    def __iter__(self):
-        return self._iter(self.prefix)
-
-    def _iter(self, prefix: tuple[Op, ...] = ()) -> Iterable[tuple[Op, ...]]:
-        seq = prefix or ()
-        ops = self.generate_options(seq)
-
+    def generate_options(self, seq: tuple[Op, ...]) -> tuple[Op, ...]:
+        ops = self._generate_options(seq)
         if self.i_constraints is not None and (i_constraint := self.i_constraints.get(len(seq))):
             ops = filter(i_constraint, ops)
 
+
         if self.unique_key:
-            prefix_keys = frozenset(self.unique_key(op) for op in prefix)
+            prefix_keys = frozenset(self.unique_key(op) for op in seq)
             ops = [op for op in ops if self.unique_key(op) not in prefix_keys]
 
         if self.curr_prev_constraint:
@@ -126,11 +128,20 @@ class SequenceBuilder:
                     continue
                 ops = [op for op in ops if f(seq[k], op)]
         ops = tuple(ops)
+        return ops
+
+    def __iter__(self):
+        return self._iter(self.prefix)
+
+    def _iter(self, prefix: tuple[Op, ...] = ()) -> Iterable[tuple[Op, ...]]:
+        seq = prefix
+        ops = self.generate_options(seq)
+
         map_func = partial(self._generate_candidates, seq=seq)
 
         if len(prefix) == len(self.prefix):
             if self.parallel:
-                with ProcessPoolExecutor() as executor:
+                with concurrent.futures.ProcessPoolExecutor() as executor:
                     for it in tqdm.tqdm(executor.map(map_func, ops), total=len(ops)):
                         yield from it
                 return
