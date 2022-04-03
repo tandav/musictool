@@ -135,6 +135,10 @@ class SequenceBuilder:
     def _iter(self, prefix: tuple[Op, ...] = ()) -> Iterable[tuple[Op, ...]]:
         seqs = [prefix]
         # breakpoint()
+
+        if self.parallel:
+            executor = concurrent.futures.ProcessPoolExecutor()
+
         while seqs:
             # print(seqs)
             seqs_new = []
@@ -146,6 +150,9 @@ class SequenceBuilder:
                     seqs_new += self._generate_candidates(seq)
                     # print('seqs_new2:', seqs_new)
             seqs = seqs_new
+
+        if self.parallel:
+            executor.shutdown()
 
         # map_func = partial(self._generate_candidates, seq=seq)
         # if len(prefix) == len(self.prefix):
@@ -182,9 +189,10 @@ class SequenceBuilder:
 
         ops = self.generate_options(seq)
         # print('ops:', ops)
+        # flat_map
         seqs = map(inner, ops)
         seqs = itertools.chain.from_iterable(seqs)
-        seqs = list(seqs)
+        # seqs = list(seqs)
         # print('*', seqs)
         # breakpoint()
         # out = tuple(inner())
