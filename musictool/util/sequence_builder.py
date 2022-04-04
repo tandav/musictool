@@ -141,13 +141,13 @@ class SequenceBuilder:
 
                 while True:
 
-                    done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
-                    # done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                    # done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+                    done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
                     # done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
                     # breakpoint()
                     # print(next(iter(done)).exception())
                     # print(done)
-                    all_completed = True
+                    all_completed = not not_done
                     for future in done:
                         for seq in future.result():
                             if len(seq) == self.n:

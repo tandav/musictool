@@ -116,10 +116,23 @@ def test_options_i(parallel):
         SequenceBuilder(3, options_i=options_i[:2], parallel=parallel)
 
 
+# def test_parallel():
+#     options_0 = 0, 1, 2, 3, 4, 5, 6, 7, 8
+#     a = SequenceBuilder(5, options=options_0, i_constraints={0: is_even})
+#     b = SequenceBuilder(5, options=options_0, i_constraints={0: is_even}, parallel=True)
+#     # assert tuple(a) == tuple(b)
+#     assert frozenset(a) == frozenset(b)
+#
+#     options_1 = 'A0', 'A1', 'C0', 'D0', 'D1', 'G0'
+#     a = SequenceBuilder(5, options=options_1, curr_prev_constraint={-1: different_startswith, -2: equal_endswith})
+#     b = SequenceBuilder(5, options=options_1, curr_prev_constraint={-1: different_startswith, -2: equal_endswith}, parallel=True)
+#     # assert tuple(a) == tuple(b)
+#     assert frozenset(a) == frozenset(b)
+
 def test_parallel():
-    options_0 = 0, 1, 2, 3, 4, 5, 6, 7, 8
-    a = SequenceBuilder(5, options=options_0, i_constraints={0: is_even})
-    b = SequenceBuilder(5, options=options_0, i_constraints={0: is_even}, parallel=True)
+    options_0 = 0, 1, 2, 3, 4
+    a = SequenceBuilder(3, options=options_0, i_constraints={0: is_even})
+    b = SequenceBuilder(3, options=options_0, i_constraints={0: is_even}, parallel=True)
     # assert tuple(a) == tuple(b)
     assert frozenset(a) == frozenset(b)
 
